@@ -144,7 +144,7 @@ The code generates the following folder(s):
 
 ## Appendix
 
-See the PDF file in the root directory: `appendix.pdf`.
+See the PDF file in the root directory for the full version with the appendix: `full_paper_with_appendix.pdf`.
 
 ## Citation
 
