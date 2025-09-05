@@ -1,0 +1,4 @@
+Loglikelihood	-298751.20
+Absolute error (based on expected number of edges)	0.014004
+RunTime	3411.56
+Estimated initiator	[0.9999, 0.806698; 0.806671, 0.206475]
