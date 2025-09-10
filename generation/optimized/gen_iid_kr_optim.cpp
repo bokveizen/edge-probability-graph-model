@@ -23,7 +23,7 @@
 
 using namespace std;
 
-#define FREQ_WRITE 1000
+#define FREQ_WRITE 1
 
 typedef boost::multiprecision::cpp_dec_float_50 float50; // 50 digits of precision
 
@@ -240,15 +240,14 @@ unsigned long long sample_node_pair(unsigned int kron_pattern_id, unsigned int n
         cur_idx++;
     }
     for (unsigned int i = 0; i < count_01; ++i) {
-        auto idx = entries[cur_idx];
-        // node1 += 0 * (1 << idx);
-        node2 += (1 << idx);
+        auto idx = entries[cur_idx];                
+        node2 |= (1 << idx);
         cur_idx++;
     }
     for (unsigned int i = 0; i < count_11; ++i) {
         auto idx = entries[cur_idx];
-        node1 += (1 << idx);
-        node2 += (1 << idx);
+        node1 |= (1 << idx);
+        node2 |= (1 << idx);
         cur_idx++;
     }
     return encode_pair(node1, node2, n_nodes);
@@ -260,19 +259,17 @@ void generate_edges(unsigned int n_rounds, unsigned int n_nodes, unsigned int k_
                     unordered_map<unsigned long long, unsigned long long> &pattern2n_pairs,
                     vector<float50> &kron_probs_round,
                     unordered_map<unsigned long long, float50> &kron_probs_remain,
-                    string &output_file_name) {
+                    vector<tuple<vector<unsigned int>, vector<unsigned int>, unsigned int, unsigned int, unsigned int>> &kron_bicliques,
+                    vector<tuple<vector<unsigned int>, unsigned int, unsigned int, unsigned int>> &kron_cliques,                    
+                    vector<unsigned long long> &remaining_edges) {
     auto n_groups = group_nodes.size();
     std::atomic<unsigned int> progress(0);
     auto start_time = chrono::steady_clock::now();
     static mutex progress_mutex;
 
-    vector<vector<unsigned long long>> edges_omp(omp_get_max_threads());
-
-    // Open a file for each thread
-    vector<ofstream> outfiles(omp_get_max_threads());    
-    for (unsigned int tid = 0; tid < omp_get_max_threads(); ++tid) {
-        outfiles[tid].open(output_file_name + "_" + to_string(tid) + ".txt");
-    }
+    vector<vector<tuple<vector<unsigned int>, vector<unsigned int>, unsigned int, unsigned int, unsigned int>>> kron_bicliques_omp(omp_get_max_threads());
+    vector<vector<tuple<vector<unsigned int>, unsigned int, unsigned int, unsigned int>>> kron_cliques_omp(omp_get_max_threads());
+    vector<vector<unsigned long long>> remaining_edges_omp(omp_get_max_threads());
 
     // First, compute the number of rounds with no active pairs
     unsigned int n_rounds_no_active_pairs = 0;
@@ -283,7 +280,11 @@ void generate_edges(unsigned int n_rounds, unsigned int n_nodes, unsigned int k_
     n_rounds_no_active_pairs = dist_binom(rng);
     unsigned int n_rounds_gen = n_rounds - n_rounds_no_active_pairs;
 
-#pragma omp parallel for schedule(dynamic, 32)
+    // Work-stealing approach to ensure all threads stay busy
+    std::atomic<unsigned int> work_index(0);
+    std::atomic<unsigned int> completed_work(0);
+    
+    #pragma omp parallel for schedule(dynamic, 32)
     for (unsigned int i_round = 0; i_round < n_rounds_gen; ++i_round) {
         int current_progress = progress;
         unsigned int tid = omp_get_thread_num();
@@ -293,15 +294,6 @@ void generate_edges(unsigned int n_rounds, unsigned int n_nodes, unsigned int k_
             display_progress(current_progress, n_rounds_gen, start_time);
         }
         progress++;
-
-        // Periodically write the edges to the file to avoid Out of Memory
-        if (i_round % FREQ_WRITE == 0 && !edges_omp[tid].empty()) {
-            for (unsigned int i = 0; i < edges_omp[tid].size(); ++i) {
-                auto edge = decode_pair(edges_omp[tid][i], n_nodes);
-                outfiles[tid] << edge.first << " " << edge.second << endl;
-            }
-            edges_omp[tid].clear();
-        }
 
         // random number generator
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -392,28 +384,11 @@ void generate_edges(unsigned int n_rounds, unsigned int n_nodes, unsigned int k_
             auto nodes_1 = group_nodes[group_1];
             auto nodes_2 = group_nodes[group_2];
 
-            if (group_1 == group_2) {
-                for (unsigned int i = 0; i < nodes_1.size(); ++i) {
-                    for (unsigned int j = i + 1; j < nodes_1.size(); ++j) {
-                        unsigned int node1 = nodes_1[i];
-                        unsigned int node2 = nodes_1[j];
-                        auto pattern_ij = count_pattern(node1, node2, k_kron);
-                        if (pattern_ij == pattern) {
-                            edges_omp[tid].push_back(encode_pair(node1, node2, n_nodes));
-                        }
-                    }
-                }
-            } else {
-                for (unsigned int i = 0; i < nodes_1.size(); ++i) {
-                    for (unsigned int j = 0; j < nodes_2.size(); ++j) {
-                        unsigned int node1 = nodes_1[i];
-                        unsigned int node2 = nodes_2[j];
-                        auto pattern_ij = count_pattern(node1, node2, k_kron);
-                        if (pattern_ij == pattern) {
-                            edges_omp[tid].push_back(encode_pair(node1, node2, n_nodes));
-                        }
-                    }
-                }
+
+            if (group_1 == group_2) { // Kronecker clique
+                kron_cliques_omp[tid].push_back(make_tuple(nodes_1, count_00, count_01, count_11));
+            } else { // Kronecker biclique
+                kron_bicliques_omp[tid].push_back(make_tuple(nodes_1, nodes_2, count_00, count_01, count_11));
             }
         }
     }
@@ -422,18 +397,18 @@ void generate_edges(unsigned int n_rounds, unsigned int n_nodes, unsigned int k_
     display_progress(n_rounds_gen, n_rounds_gen, start_time);
     cout << endl;
 
-    // Ensure all the edges are written to the file
-    #pragma omp parallel for
-    for (unsigned int tid = 0; tid < omp_get_max_threads(); ++tid) {
-        for (unsigned int i = 0; i < edges_omp[tid].size(); ++i) {
-            auto edge = decode_pair(edges_omp[tid][i], n_nodes);
-            outfiles[tid] << edge.first << " " << edge.second << endl;
-        }
-        edges_omp[tid].clear();
+    // Collect results from all threads
+    for (const auto& thread_cliques : kron_cliques_omp) {
+        kron_cliques.insert(kron_cliques.end(), thread_cliques.begin(), thread_cliques.end());
+    }
+    for (const auto& thread_bicliques : kron_bicliques_omp) {
+        kron_bicliques.insert(kron_bicliques.end(), thread_bicliques.begin(), thread_bicliques.end());
     }
 
+    cout << "Deal with remaining edges" << endl;
+
     // Deal with reaminging edges
-    if (!kron_probs_remain.empty()) {    
+    if (!kron_probs_remain.empty()) {
         for (auto it = kron_probs_remain.begin(); it != kron_probs_remain.end(); ++it) {
             auto kron_pattern_id = it->first;
             auto p_remain = it->second;
@@ -452,30 +427,19 @@ void generate_edges(unsigned int n_rounds, unsigned int n_nodes, unsigned int k_
             #pragma omp parallel for schedule(dynamic, 32)
             for (int i_round = 0; i_round < n_rounds_remain_int; i_round++) {
                 int tid = omp_get_thread_num();
-
                 unsigned seed_thread = seed + i_round + tid * n_rounds_remain_int;
                 mt19937 rng_thread(seed_thread);
 
                 // sample a pair uniformly at random
                 unsigned long long pair_id = sample_node_pair(kron_pattern_id, n_nodes, k_kron);
-                edges_omp[tid].push_back(pair_id);
-            }
-            
-            // Write the edges to the file
-            #pragma omp parallel for
-            for (unsigned int tid = 0; tid < omp_get_max_threads(); ++tid) {
-                for (unsigned int i = 0; i < edges_omp[tid].size(); ++i) {
-                    auto edge = decode_pair(edges_omp[tid][i], n_nodes);
-                    outfiles[tid] << edge.first << " " << edge.second << endl;
-                }
-                edges_omp[tid].clear();
-            }
+                remaining_edges_omp[tid].push_back(pair_id);
+            }            
         }
     }
 
-    // Close all files
-    for (unsigned int tid = 0; tid < omp_get_max_threads(); ++tid) {
-        outfiles[tid].close();
+    // Collect results from all threads
+    for (const auto& thread_edges : remaining_edges_omp) {
+        remaining_edges.insert(remaining_edges.end(), thread_edges.begin(), thread_edges.end());
     }
 
     return;
@@ -488,19 +452,22 @@ int main(int argc, char const *argv[]) {
     // argv[2]: output filename
     // argv[3]: number of generated graphs
     // argv[4]: up_scale
+    // argv[5]: expand
 
     // read the file name from argv into a string
-    if (argc != 5) {
+    if (argc != 6) {
         cout << "Usage: " << argv[0] << " <filename_in>"
              << " <filename_out>"
              << " <n_graphs>"
-             << " <up_scale>" << endl;
+             << " <up_scale>" 
+             << " <expand>" << endl;             
         return 1;
     }
     string filename_in = argv[1];
     string filename_out = argv[2];
     unsigned int n_graphs = atoi(argv[3]);
     unsigned int up_scale = atoi(argv[4]);
+    bool expand = atoi(argv[5]);
 
     // Input validation
     if (n_graphs <= 0) {
@@ -659,12 +626,14 @@ int main(int argc, char const *argv[]) {
         }
 
         // generate edge using binding
-        auto start = std::chrono::steady_clock::now(); // Start the timer
-        
-        string file_name = filename_out + "_" + to_string(i_graph);
+        auto start = std::chrono::steady_clock::now(); // Start the timer                        
+
+        vector<tuple<vector<unsigned int>, vector<unsigned int>, unsigned int, unsigned int, unsigned int>> kron_bicliques;
+        vector<tuple<vector<unsigned int>, unsigned int, unsigned int, unsigned int>> kron_cliques;
+        vector<unsigned long long> remaining_edges;
 
         generate_edges(n_rounds, total_nodes, k_kron, nzero2nodes, nzero2alpha, kron_patterns,
-                       pattern2n_pairs, kron_probs_round, kron_probs_remain, file_name);        
+                       pattern2n_pairs, kron_probs_round, kron_probs_remain, kron_bicliques, kron_cliques, remaining_edges);
 
         auto end = std::chrono::steady_clock::now(); // Stop the timer
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -675,6 +644,51 @@ int main(int argc, char const *argv[]) {
         // Track memory after generation
         MemoryInfo post_generation_memory = get_memory_usage();
         memory_snapshots.push_back(post_generation_memory);
+
+        ofstream outfile;
+        outfile.open(filename_out + "_" + to_string(i_graph) + ".txt");
+        auto start_write = std::chrono::steady_clock::now(); // Start the timer
+
+        // Write kron_cliques section
+        outfile << "KRON_CLIQUES " << kron_cliques.size() << endl;
+        for (const auto& clique : kron_cliques) {
+            outfile << get<0>(clique).size() << " " << get<1>(clique) << " " << get<2>(clique) << " " << get<3>(clique);
+            for (unsigned int node : get<0>(clique)) {
+                outfile << " " << node;
+            }
+            outfile << endl;
+        }
+
+        // Write kron_bicliques section
+        outfile << "KRON_BICLIQUES " << kron_bicliques.size() << endl;
+        for (const auto& biclique : kron_bicliques) {
+            outfile << get<0>(biclique).size() << " " << get<1>(biclique).size() << " " << get<2>(biclique) << " " << get<3>(biclique) << " " << get<4>(biclique);
+            for (unsigned int node : get<0>(biclique)) {
+                outfile << " " << node;
+            }
+            for (unsigned int node : get<1>(biclique)) {
+                outfile << " " << node;
+            }
+            outfile << endl;
+        }
+
+        // Write remaining edges section
+        outfile << "REMAINING_EDGES " << remaining_edges.size() << endl;
+        for (unsigned long long pair_id : remaining_edges) {
+            auto edge = decode_pair(pair_id, total_nodes);
+            outfile << edge.first << " " << edge.second << endl;
+        }
+
+        auto end_write = std::chrono::steady_clock::now(); // Stop the timer
+        auto duration_write = std::chrono::duration_cast<std::chrono::milliseconds>(
+            end_write - start_write); // Calculate the duration in milliseconds
+        double write_time_ms = duration_write.count();
+        write_times.push_back(write_time_ms);
+        outfile.close();
+
+        if (expand) {
+            // TODO
+        }
     }
 
     // Calculate and print statistics for generation times
