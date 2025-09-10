@@ -429,6 +429,7 @@ void generate_edges(unsigned int n_rounds, unsigned int n_nodes, unsigned int k_
             auto edge = decode_pair(edges_omp[tid][i], n_nodes);
             outfiles[tid] << edge.first << " " << edge.second << endl;
         }
+        edges_omp[tid].clear();
     }
 
     // Deal with reaminging edges
