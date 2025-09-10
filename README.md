@@ -3,6 +3,7 @@
 This repository contains the appendix, code, and data for the paper "Edge Probability Graph Models Beyond Edge Independency" published in the IEEE International Conference on Data Mining (ICDM) 2025.
 
 Paper link (TBD):
+
 - [IEEE Xplore]()
 - [arXiv (full version)](https://arxiv.org/abs/2405.16726)
 
@@ -89,7 +90,6 @@ The code generates the following folder(s):
 - For the Erdos-Renyi (ER) model, we use the Wolfram Language for better numerical accuracy.
 - For the other models, we use Python (specifically, gradient descent with PyTorch). We used PyTorch 1.9.0, but it should work with many other versions.
 
-
 ## Generation (Folder `generation`)
 
 ### Overview
@@ -99,6 +99,7 @@ We generate graphs using the proposed edge-probability graph models (EPGMs).
 ### Contents
 
 Files:
+
 - `gen_iid_er.cpp`: The graph generation code for the Erdos-Renyi (ER) model with parallel binding.
 - `gen_iter_er.cpp`: The graph generation code for the Erdos-Renyi (ER) model with local binding.
 - `gen_iid_cl.cpp`: The graph generation code for the Chung-Lu (CL) model with parallel binding.
@@ -127,6 +128,10 @@ Files:
 - `gen_scratch_kr_iid.sh`: The script to run the graph generation code for the stochastic Kronecker (KR) model with parallel binding, using edge probabilities "from scratch".
 - `gen_scratch_kr_iter.sh`: The script to run the graph generation code for the stochastic Kronecker (KR) model with local binding, using edge probabilities "from scratch".
 
+Subfolders:
+
+- `optimized`: The graph generation code optimized for large-scale graphs.
+
 ### How to run
 
 ```bash
@@ -149,9 +154,10 @@ See the PDF file in the root directory for the full version with the appendix: `
 ## Citation
 
 If you find this work useful, please consider citing:
+
 ```bibtex
 @inproceedings{Bu2025EPGM,
-  title={Edge Probability Graph Models Beyond Edge Independency: Concepts, Analyses, and Algorithms}, 
+  title={Edge Probability Graph Models Beyond Edge Independency: Concepts, Analyses, and Algorithms},
   author={Bu, Fanchen and Yang, Ruochen and Bogdan, Paul and Shin, Kijung},
   booktitle={ICDM},
   year={2025}
