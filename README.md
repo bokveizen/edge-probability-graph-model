@@ -5,7 +5,7 @@ This repository contains the appendix, code, and data for the paper "Edge Probab
 Paper link (TBD):
 
 - [IEEE Xplore]()
-- [arXiv (full version)](https://arxiv.org/abs/2405.16726)
+- [arXiv](https://arxiv.org/abs/2405.16726)
 
 ## Data Preparation (Folder `data`)
 
