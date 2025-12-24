@@ -119,14 +119,6 @@ Files:
 - `gen_iter_kr.sh`: The script to run the graph generation code for the stochastic Kronecker (KR) model with local binding.
 - `gen.sh`: The script to run the graph generation code for all the models.
 - `compile.sh`: The script to compile the graph generation code.
-- `gen_scratch_er_iid.sh`: The script to run the graph generation code for the Erdos-Renyi (ER) model with parallel binding, using edge probabilities "from scratch", i.e., not using results fit to a specific graph but manipulate the parameters directly.
-- `gen_scratch_er_iter.sh`: The script to run the graph generation code for the Erdos-Renyi (ER) model with local binding, using edge probabilities "from scratch".
-- `gen_scratch_cl_iid.sh`: The script to run the graph generation code for the Chung-Lu (CL) model with parallel binding, using edge probabilities "from scratch".
-- `gen_scratch_cl_iter.sh`: The script to run the graph generation code for the Chung-Lu (CL) model with local binding, using edge probabilities "from scratch".
-- `gen_scratch_sbm_iid.sh`: The script to run the graph generation code for the stochastic block (SB) model with parallel binding, using edge probabilities "from scratch".
-- `gen_scratch_sbm_iter.sh`: The script to run the graph generation code for the stochastic block (SB) model with local binding, using edge probabilities "from scratch".
-- `gen_scratch_kr_iid.sh`: The script to run the graph generation code for the stochastic Kronecker (KR) model with parallel binding, using edge probabilities "from scratch".
-- `gen_scratch_kr_iter.sh`: The script to run the graph generation code for the stochastic Kronecker (KR) model with local binding, using edge probabilities "from scratch".
 
 Subfolders:
 

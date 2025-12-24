@@ -1,0 +1,7 @@
+dataset n_node n_edges n_4_cliques
+facebook 4039 88234 30004668
+hamsterster 2000 16097 131905
+polblogs 1222 16717 422327
+web-spam 4767 37375 374355
+bio-CE-PG 1692 47309 9608852
+bio-SC-HT 2077 63023 26302487
