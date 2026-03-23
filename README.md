@@ -2,9 +2,9 @@
 
 This repository contains the appendix, code, and data for the paper "Edge Probability Graph Models Beyond Edge Independency" published in the IEEE International Conference on Data Mining (ICDM) 2025.
 
-Paper link (TBD):
+Paper link:
 
-- [IEEE Xplore]()
+- [IEEE Xplore](https://ieeexplore.ieee.org/document/11391816)
 - [arXiv](https://arxiv.org/abs/2405.16726)
 
 ## Data Preparation (Folder `data`)
